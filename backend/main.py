@@ -14,6 +14,21 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+@app.get("/api/races/{year}")
+async def get_races(year: int):
+    try:
+        schedule = fastf1.get_event_schedule(year)
+        events = []
+        for _, event in schedule.iterrows():
+            events.append({
+                "name": event["EventName"],
+                "loacation": event["Location"],
+                "country": event["Country"],
+                "date": event["EventDate"].strftime("%Y-%m-%d")
+            })
+        return {"events": events}
+    except Exception as e:
+        return {"error": str(e)}
 @app.get("/api/sessions/{year}/{event}")
 async def get_sessions(year:int, event:str):
     try:
@@ -39,6 +54,51 @@ async def get_drivers(year:int, event:str, session:str):
         driver_list = sorted(list(set(f1_session.laps['Driver'])))
         driver_name = sorted(list(set(f1_session.laps['Driver'])))
         return {"drivers": driver_list}
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/api/drivers/details/{year}/{event}/{session}")
+async def get_drivers_details(year: int, event: str, session: str):
+    import fastf1
+    import numpy as np
+
+    try:
+        f1_session = fastf1.get_session(year, event, session)
+        # Make sure laps=True so driver data is loaded!
+        f1_session.load(telemetry=False, laps=True, weather=False)
+
+        # Unique driver codes from laps
+        driver_codes = sorted(set(f1_session.laps['Driver']))
+
+        drivers_info = []
+        for code in driver_codes:
+            try:
+                driver = f1_session.get_driver(code)
+                # Some FastF1 installs use 'FullName', some use 'FirstName'/'LastName'
+                if 'FullName' in driver:
+                    name = str(driver['FullName'])
+                elif 'FirstName' in driver and 'LastName' in driver:
+                    name = f"{driver['FirstName']} {driver['LastName']}"
+                else:
+                    name = str(code)
+                team = None
+                if 'Team' in driver and driver['Team']:
+                    team = driver['Team']
+                if not team:
+                    laps = f1_session.laps
+                    driver_laps = laps[laps['Driver'] == code]
+                    if not driver_laps.empty and 'Team' in driver_laps.columns:
+                        team = driver_laps.iloc[0]['Team']
+            except Exception:
+                name = str(code)
+                team = 'Unknown'
+            drivers_info.append({
+                "code": str(code),
+                "name": name,
+                "team": team
+            })
+
+        return {"drivers": drivers_info}
     except Exception as e:
         return {"error": str(e)}
 
