@@ -107,7 +107,7 @@ async def get_drivers_details(year: int, event: str, session: str):
 async def get_telemetry_data(year: int, event: str, session: str, driver: str):
     try:
         f1_session = fastf1.get_session(year, event, session)
-        f1_session.load()
+        f1_session.loa()
 
         driver_lap = f1_session.laps.pick_drivers(driver.upper()).pick_fastest()
         car_data = driver_lap.get_telemetry().add_distance()
