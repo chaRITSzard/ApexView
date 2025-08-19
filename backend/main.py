@@ -8,7 +8,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], #only for dev purpose, can;t allow when published
+    allow_origins=["*"], #only for dev purpose, can't allow when published
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -22,7 +22,7 @@ async def get_races(year: int):
         for _, event in schedule.iterrows():
             events.append({
                 "name": event["EventName"],
-                "loacation": event["Location"],
+                "location": event["Location"],
                 "country": event["Country"],
                 "date": event["EventDate"].strftime("%Y-%m-%d")
             })
@@ -121,3 +121,48 @@ async def get_telemetry_data(year: int, event: str, session: str, driver: str):
         }
     except Exception as e:
         return {"error": f"Failed to fetch data: {str(e)}"}
+
+@app.get("/api/races/{year}/{event}/{session}")
+async def get_standings(year:int, event:str, session:str):
+    try:
+        fastf1.Cache.enable_cache('cache_dir')
+        f1_session = fastf1.get_session(year, event, session)
+        f1_session.load()
+
+        standings = f1_session.results.loc[:, ['Abbreviation', 'TeamName', 'ClassifiedPosition', 'Points']].to_dict('records')
+        return standings
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/api/seasons/driver/{year}")
+async def get_standings(year:int):
+    try:
+        season = year
+        schedule = fastf1.get_event_schedule(year)
+        final_round = schedule['RoundNumber'].max()
+        final_race = fastf1.get_session(year, final_round, 'R')
+        final_race.load()
+
+        standings = final_race.results[['Abbreviation', 'TeamName', 'Points']].copy()
+        standings = standings.sort_values('Points', ascending=False).reset_index(drop=True)
+
+        return standings
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/api/seasons/constructor/{year}")
+async def get_standings(year:int):
+    season = year
+    schedule = fastf1.get_event_schedule(year)
+    final_round = schedule['RoundNumber'].max()
+    final_race = fastf1.get_session(year, final_round, 'R')
+    final_race.load()
+
+    standings = final_race.results[['Abbreviation', 'TeamName', 'Points']].copy()
+    standings = standings.sort_values('Points', ascending=False).reset_index(drop=True)
+
+    constructors = (standings.groupby('TeamName')['Points']
+                    .max()
+                    .sort_values(ascending=False)
+                    .reset_index())
+    return constructors
