@@ -1,6 +1,3 @@
-"""
-FastAPI backend for ApexView F1 data API with optimized caching
-"""
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
